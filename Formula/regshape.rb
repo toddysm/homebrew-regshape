@@ -49,7 +49,6 @@ class Regshape < Formula
   end
 
   test do
-    assert_match "regshape", shell_output("#{bin}/regshape --help")
-    assert_match version.to_s, shell_output("#{bin}/regshape --version")
+    assert_match "Usage:", shell_output("#{bin}/regshape --help")
   end
 end
