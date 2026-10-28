@@ -6,36 +6,49 @@ on:
       - main
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   test-bot:
     strategy:
+      fail-fast: false
       matrix:
         os: [macos-14, ubuntu-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - name: Set up Homebrew
         id: set-up-homebrew
-        uses: Homebrew/actions/setup-homebrew@master
+        uses: Homebrew/actions/setup-homebrew@main
 
       - name: Cache Homebrew Bundler RubyGems
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ${{ steps.set-up-homebrew.outputs.gems-path }}
           key: ${{ matrix.os }}-rubygems-${{ steps.set-up-homebrew.outputs.gems-hash }}
           restore-keys: ${{ matrix.os }}-rubygems-
 
-      - name: Checkout
-        uses: actions/checkout@v4
+      - name: Verify tap checkout
+        run: |
+          actual_sha="$(git -C "$(brew --repository toddysm/regshape)" rev-parse HEAD)"
+          if [[ "$actual_sha" != "$GITHUB_SHA" ]]; then
+            echo "::error::Tap checkout is at $actual_sha; expected $GITHUB_SHA"
+            exit 1
+          fi
 
       - name: Run brew style
+        working-directory: ${{ steps.set-up-homebrew.outputs.repository-path }}
         run: brew style .
 
       - name: Run brew test-bot
+        working-directory: ${{ steps.set-up-homebrew.outputs.repository-path }}
         run: brew test-bot --only-tap-syntax
 
-      - name: Test formula install
-        run: |
-          brew tap toddysm/regshape "$(pwd)"
-          brew install --build-from-source --verbose regshape
-          brew test regshape
-          brew audit --strict regshape
+      - name: Install formula from source
+        run: brew install --build-from-source --verbose toddysm/regshape/regshape
+
+      - name: Test formula
+        run: brew test toddysm/regshape/regshape
+
+      - name: Audit formula
+        run: brew audit --strict toddysm/regshape/regshape
